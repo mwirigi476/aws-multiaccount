@@ -1,4 +1,4 @@
-name: Test OIDC
+name: Deploy
 
 on:
   push:
@@ -9,14 +9,17 @@ permissions:
   contents: read
 
 jobs:
-  test:
+  deploy:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::037077641482:role/GitHubActionsRole
           aws-region: us-east-1
 
-      - name: Print AWS Account
-        run: aws sts get-caller-identity
+      - name: Test
+        run: echo "Success"
