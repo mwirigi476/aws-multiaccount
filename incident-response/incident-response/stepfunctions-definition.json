@@ -1,0 +1,57 @@
+{
+  "Comment": "Automated incident response: GuardDuty finding -> isolate EC2 -> log -> notify",
+  "StartAt": "ValidateFinding",
+  "States": {
+    "ValidateFinding": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:803871049728:function:ValidateGuardDutyFinding",
+      "Next": "IsSevere",
+      "Catch": [{"ErrorEquals": ["States.ALL"], "Next": "LogFailure"}]
+    },
+    "IsSevere": {
+      "Type": "Choice",
+      "Choices": [{
+        "Variable": "$.severity",
+        "NumericGreaterThanEquals": 7,
+        "Next": "IsolateInstance"
+      }],
+      "Default": "LogLowSeverity"
+    },
+    "IsolateInstance": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:803871049728:function:IsolateEC2Instance",
+      "Next": "LogFindingToS3",
+      "Retry": [{
+        "ErrorEquals": ["States.TaskFailed"],
+        "IntervalSeconds": 5,
+        "MaxAttempts": 3,
+        "BackoffRate": 2
+      }]
+    },
+    "LogFindingToS3": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:803871049728:function:LogFindingToS3",
+      "Next": "NotifySecurityTeam"
+    },
+    "NotifySecurityTeam": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sns:publish",
+      "Parameters": {
+        "TopicArn": "arn:aws:sns:us-east-1:803871049728:security-findings-alerts",
+        "Message.$": "States.Format('INCIDENT: {} | Severity: {} | Instance: {}', $.findingType, $.severity, $.instanceId)"
+      },
+      "Next": "IncidentComplete"
+    },
+    "IncidentComplete": {"Type": "Succeed"},
+    "LogLowSeverity": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:803871049728:function:LogFindingToS3",
+      "End": true
+    },
+    "LogFailure": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:803871049728:function:LogFindingToS3",
+      "End": true
+    }
+  }
+}
